@@ -9,27 +9,15 @@ import noise_net"../common/noise_networking"
 import ss "../common/smallstrings"
 import crypto_core "../common/ezpassman_crypto_core"
 import sqlite "../common/sqlite3_bindings"
+import client "../client"
 
 EzString :: ss.SmallString(255)
 
-RequestType :: enum u8 {
-    NewUser = 1,
-    FetchVault = 2,
-    DeleteVault = 3,
-    UpdateVault = 4,
-    Error = 255,
-}
 
-Request :: struct {
-    kind: RequestType,
-    user_id: EzString,
-    auth_token: u64,
-}
-
-parse_request :: proc(data: []u8) -> Request {
+parse_request :: proc(data: []u8) -> client.Request {
     user_id, succeeded := ss.from_slice(data[1 : 257], 255)
     auth_token, endian_success := endian.get_u64(data[257 : 257+8], .Little)
-    kind: RequestType
+    kind: client.RequestType
     switch data[0] {
         case 1: kind = .NewUser
         case 2: kind = .FetchVault
@@ -37,7 +25,7 @@ parse_request :: proc(data: []u8) -> Request {
         case 4: kind = .UpdateVault
         case: kind = .Error
     }
-    request := Request{
+    request := client.Request{
         kind = kind,
         user_id = user_id,
         auth_token = auth_token,
@@ -81,7 +69,7 @@ main :: proc() {
         hs : noise.Handshake_State
         hs_status := noise.handshake_init(&hs, false, nil, nil, nil, noise_net.DEFAULT_PROTOCOL_NAME)
         connection, connection_status := noise_net.establish_connection_all_the_way(socket, peer)
-        data, nonce, data_status := noise_net.receive_data(&connection, expected_len = size_of(Request))
+        data, nonce, data_status := noise_net.receive_data(&connection, expected_len = size_of(client.Request))
         if data_status != .ok {
             fmt.println("Status: ", data_status)
             return
