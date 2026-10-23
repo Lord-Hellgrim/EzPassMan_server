@@ -17,6 +17,9 @@ EzString :: ss.SmallString(255)
 parse_request :: proc(data: []u8) -> client.Request {
     user_id, succeeded := ss.from_slice(data[1 : 257], 255)
     auth_token, endian_success := endian.get_u64(data[257 : 257+8], .Little)
+    if auth_token != 5 {
+        return client.Request{kind = .Error}
+    }
     kind: client.RequestType
     switch data[0] {
         case 1: kind = .NewUser
@@ -69,12 +72,14 @@ main :: proc() {
         hs : noise.Handshake_State
         hs_status := noise.handshake_init(&hs, false, nil, nil, nil, noise_net.DEFAULT_PROTOCOL_NAME)
         connection, connection_status := noise_net.establish_connection_all_the_way(socket, peer)
+        fmt.println("connection established")
         data, nonce, data_status := noise_net.receive_data(&connection, expected_len = size_of(client.Request))
         if data_status != .ok {
             fmt.println("Status: ", data_status)
             return
         }
         request := parse_request(data)
+        fmt.println("request received")
 
         switch request.kind {
             case .NewUser: {
@@ -102,14 +107,17 @@ main :: proc() {
 
             }
             case .FetchVault: {
+                fmt.println("processing new FetchVault request")
                 sqlite.bind_text(read_stmt, ss.as_string(&request.user_id), 0)
                 read_step_status := sqlite.step_statement(vault_database, read_stmt)
                 if read_step_status != .ROW {
                     continue
                 }
                 vault_blob, read_status := sqlite.get_column_blob(read_stmt, 0)
+                fmt.println("vault blob retreived from SQLITE")
                 
                 noise_net.send_data(&connection, vault_blob, allocator = context.temp_allocator)
+                fmt.println("Vault blob sent")
             }
             case .DeleteVault: {
                 panic("NEW USER PATH UNIMPLEMENTED")
