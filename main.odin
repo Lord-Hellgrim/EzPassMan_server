@@ -116,7 +116,7 @@ main :: proc() {
                 vault_blob, read_status := sqlite.get_column_blob(read_stmt, 0)
                 fmt.println("vault blob retreived from SQLITE")
                 
-                noise_net.send_data(&connection, vault_blob, allocator = context.temp_allocator)
+                send_status := noise_net.alt_send_data(&connection, vault_blob)
                 fmt.println("Vault blob sent")
             }
             case .DeleteVault: {
